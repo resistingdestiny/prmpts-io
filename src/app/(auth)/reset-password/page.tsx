@@ -15,13 +15,15 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
+  const [expired, setExpired] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const supabase = createClient();
 
-    // Listen for the PASSWORD_RECOVERY event which fires when the user
-    // arrives from the reset email link and Supabase processes the token
+    // The auth callback already exchanged the code and set the session cookie.
+    // We just need to verify there's an active session.
+    // Also listen for auth events in case the session is still being established.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event) => {
         if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
@@ -30,12 +32,28 @@ export default function ResetPasswordPage() {
       }
     );
 
-    // Also check if there's already a session (e.g. page refresh)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true);
+    // Check for existing session (set by /auth/callback redirect)
+    supabase.auth.getUser().then(({ data: { user }, error: err }) => {
+      if (user) {
+        setReady(true);
+      } else if (err) {
+        // No session and no recovery event — link is invalid or expired
+        setExpired(true);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    // Fallback: if nothing happens after 5 seconds, show expired state
+    const timeout = setTimeout(() => {
+      setReady((current) => {
+        if (!current) setExpired(true);
+        return current;
+      });
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -69,6 +87,20 @@ export default function ResetPasswordPage() {
         <Button onClick={() => router.push("/explore")} className="w-full">
           Continue to prmpts
         </Button>
+      </Card>
+    );
+  }
+
+  if (expired) {
+    return (
+      <Card className="w-full max-w-sm p-6 text-center">
+        <h1 className="mb-2 text-xl font-bold">Link expired</h1>
+        <p className="mb-4 text-sm text-muted">
+          This reset link is invalid or has expired. Please request a new one.
+        </p>
+        <Link href="/forgot-password">
+          <Button className="w-full">Request new link</Button>
+        </Link>
       </Card>
     );
   }
