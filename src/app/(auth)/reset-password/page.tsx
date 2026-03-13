@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,30 @@ export default function ResetPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
   const [done, setDone] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    // Listen for the PASSWORD_RECOVERY event which fires when the user
+    // arrives from the reset email link and Supabase processes the token
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event) => {
+        if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+          setReady(true);
+        }
+      }
+    );
+
+    // Also check if there's already a session (e.g. page refresh)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +69,15 @@ export default function ResetPasswordPage() {
         <Button onClick={() => router.push("/explore")} className="w-full">
           Continue to prmpts
         </Button>
+      </Card>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <Card className="w-full max-w-sm p-6 text-center">
+        <h1 className="mb-2 text-xl font-bold">Verifying reset link</h1>
+        <p className="text-sm text-muted">Please wait...</p>
       </Card>
     );
   }
