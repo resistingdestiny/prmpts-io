@@ -173,9 +173,12 @@ end;
 $$ language plpgsql;
 
 create or replace function handle_new_user()
-returns trigger as $$
+returns trigger
+security definer
+set search_path = ''
+as $$
 begin
-  insert into profiles (id, username, display_name, avatar_url)
+  insert into public.profiles (id, username, display_name, avatar_url)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'preferred_username', split_part(new.email, '@', 1)),
