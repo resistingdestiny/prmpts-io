@@ -62,6 +62,11 @@ function LoginForm() {
           required
         />
         {error && <p className="text-sm text-red-500">{error}</p>}
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-xs text-muted hover:text-foreground">
+            Forgot password?
+          </Link>
+        </div>
         <Button type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </Button>
